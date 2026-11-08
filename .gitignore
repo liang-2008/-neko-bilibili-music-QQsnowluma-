@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+bilibili_cookies.txt
+*.m4a
+*.mp3
+*.log
