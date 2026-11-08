@@ -83,7 +83,11 @@ _load_dotenv(BASE_DIR / ".env")
 SNOWLUMA_WS_URL = os.getenv("SNOWLUMA_WS_URL", "ws://127.0.0.1:3001/").strip()
 SNOWLUMA_ACCESS_TOKEN = os.getenv("SNOWLUMA_ACCESS_TOKEN", "").strip()
 
-COMMAND = os.getenv("JUKEBOX_COMMAND", "点歌").strip() or "点歌"
+# 读取环境变量，并用英文逗号分割成列表
+COMMAND_STR = os.getenv("JUKEBOX_COMMAND", "点歌").strip()
+COMMANDS = [c.strip() for c in COMMAND_STR.split(",") if c.strip()]
+if not COMMANDS:
+    COMMANDS = ["点歌"]
 _cookie_env = os.getenv("BILI_COOKIE_FILE", "").strip()
 COOKIE_FILE = (
     Path(_cookie_env).expanduser()
@@ -785,13 +789,22 @@ class JukeboxApp:
             return
 
         text = _message_text(event.get("message"))
-        if not text.startswith(COMMAND):
+        
+        # 遍历所有指令，看用户发的话是不是以其中某一个开头
+        matched_cmd = next((c for c in COMMANDS if text.startswith(c)), None)
+        
+        # 如果没有匹配到任何指令，直接退出（不管这条消息）
+        if not matched_cmd:
             return
 
-        query = text[len(COMMAND):].strip(" \t\r\n：:，,")
+        # 根据匹配到的具体指令，截取后面的歌名
+        query = text[len(matched_cmd):].strip(" \t\r\n:：,，")
+        
         if not query:
-            await self._safe_text(group_id, f"用法：{COMMAND} 歌名 [歌手]")
+            # 没输入歌名时的提示，这里会显示用户刚才用的哪个词
+            await self._safe_text(group_id, f"用法：{matched_cmd} 歌名")
             return
+            
         query = query[:100]
 
         message_id = str(event.get("message_id") or "")
@@ -872,7 +885,7 @@ def main() -> None:
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    LOG.info("点歌指令: %s <歌名>", COMMAND)
+    LOG.info("点歌指令: %s <歌名>", COMMANDS)
     LOG.info("语音上限: %s 秒，格式: MP3 单声道 24kHz", MAX_VOICE_SECONDS)
     LOG.info("ffmpeg: %s", _find_ffmpeg() or "未找到")
     LOG.info("群白名单: %s", GROUP_WHITELIST or "全部群")
